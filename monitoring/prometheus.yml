@@ -1,0 +1,51 @@
+# Prometheus configuration for Free Fire Bot monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'firebot-monitor'
+
+# Rule files
+rule_files:
+  - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Free Fire Bot metrics
+  - job_name: 'firebot'
+    static_configs:
+      - targets: ['firebot:8080']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    
+  # System metrics (if node_exporter is added)
+  - job_name: 'system'
+    static_configs:
+      - targets: ['firebot:9100']
+    scrape_interval: 15s
+    
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+    scrape_interval: 30s
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 7d
+    retention.size: 1GB
