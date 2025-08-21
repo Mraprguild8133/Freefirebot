@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
-COPY pyproject.toml uv.lock ./
-RUN pip install uv && \
-    uv pip install --system -r uv.lock
+COPY pyproject.toml/
+RUN pip install uv 
+    uv pip install -r requirements.txt
 
 # Production stage
 FROM python:3.11-slim as production
