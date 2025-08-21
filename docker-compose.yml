@@ -1,0 +1,185 @@
+# Docker Compose configuration for Free Fire Bot
+# Mean priority deployment with service orchestration
+
+version: '3.8'
+
+services:
+  # Main Free Fire Bot Service
+  firebot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: free-fire-bot
+    restart: unless-stopped
+    
+    # Resource allocation - Mean priority settings
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # CPU priority settings
+    cpu_shares: 1024  # Default priority (mean)
+    mem_limit: 512m
+    memswap_limit: 512m
+    
+    # Network configuration
+    ports:
+      - "5000:5000"  # Web interface
+      - "8080:8080"  # Health check
+    
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=INFO
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - FREE_FIRE_API_KEY=${FREE_FIRE_API_KEY:-}
+      - GARENA_API_KEY=${GARENA_API_KEY:-}
+    
+    # Volume mounts
+    volumes:
+      - bot_logs:/app/logs
+      - bot_data:/app/data
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run
+    
+    # Dependencies
+    depends_on:
+      - redis
+      - monitoring
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: firebot-redis
+    restart: unless-stopped
+    
+    # Lower priority for cache service
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    
+    cpu_shares: 512  # Lower priority
+    mem_limit: 128m
+    
+    # Redis configuration
+    command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru
+    
+    volumes:
+      - redis_data:/data
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+
+  # Monitoring and metrics
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: firebot-monitoring
+    restart: unless-stopped
+    
+    # Lowest priority for monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    
+    cpu_shares: 256  # Lowest priority
+    mem_limit: 256m
+    
+    ports:
+      - "9090:9090"
+    
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: firebot-nginx
+    restart: unless-stopped
+    
+    # Medium priority for web server
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.2'
+          memory: 64M
+    
+    cpu_shares: 768  # Medium priority
+    mem_limit: 128m
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    
+    depends_on:
+      - firebot
+
+# Named volumes for persistent data
+volumes:
+  bot_logs:
+    driver: local
+  bot_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

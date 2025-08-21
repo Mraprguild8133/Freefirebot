@@ -1,0 +1,61 @@
+modules = ["python-3.11"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Free Fire Bot"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "telegram_bot_test"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Web Interface"
+
+[[workflows.workflow]]
+name = "Free Fire Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pip install --force-reinstall python-telegram-bot aiohttp && python main.py"
+
+[[workflows.workflow]]
+name = "telegram_bot_test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pip install python-telegram-bot aiohttp && export TELEGRAM_BOT_TOKEN=\"test_token_123\" && python main.py"
+
+[[workflows.workflow]]
+name = "Web Interface"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd web && python app.py"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
