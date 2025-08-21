@@ -1,31 +1,23 @@
-# Free Fire Telegram Bot Docker Image
-# Multi-stage build for optimized production deployment
+FROM python:3.11-slim
 
-# Build stage
-FROM python:3.11-slim as builder
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
+    gcc \
+    g++ \
+    libxml2-dev \
+    libxslt-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
-WORKDIR /app
+# Try installing with uv first, fall back to pip if it fails
+COPY requirements.txt ./
+RUN pip install --no-cache-dir uv && \
+    (uv pip install --no-cache -r requirements.txt || \
+     pip install --no-cache-dir -r requirements.txt)
 
-# Copy requirements and install Python dependencies
-COPY pyproject.toml/
-RUN pip install uv 
-    uv pip install -r requirements.txt
-
-# Production stage
-FROM python:3.11-slim as production
+COPY . .
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
